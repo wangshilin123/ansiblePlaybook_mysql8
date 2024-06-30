@@ -1,0 +1,69 @@
+- name: Install required dependencies
+  yum:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - libaio
+    - numactl
+
+- name: Copy MySQL tarball to remote server
+  copy:
+    src: mysql-8.4.0-1.el7.x86_64.tar.gz
+    dest: /usr/local/mysql-8.4.0-1.el7.x86_64.tar.gz
+
+
+- name: Extract Mysql tar package
+  unarchive:
+    src: /usr/local/mysql-8.4.0-1.el7.x86_64.tar.gz
+    dest: /usr/local/
+    remote_src: yes
+
+- name: List extracted files
+  command: ls -l /usr/local/mysql-8.4.0-1.el7.x86_64
+  register: extracted_files
+
+- name: Debug extracted files
+  debug:
+    var: extracted_files.stdout_lines
+
+- name: Find RPM files
+  find:
+    paths: /usr/local/mysql-8.4.0-1.el7.x86_64
+    patterns: "*.rpm"
+  register: rpm_files
+
+- name: Debug RPM files
+  debug:
+    var: rpm_files
+
+#- name: Install MySQL from RPM packages
+#  yum:
+#    name: "{{ item }}"
+#    state: present
+#    localinstall: yes
+#  with_fileglob:
+#    - /usr/local/mysql-8.4.0-1.el7.x86_64/*.rpm
+#
+#
+- name: Install MySQL
+  yum:
+    name: "{{ item.path }}"
+    state: present
+  loop: "{{ rpm_files.files }}"
+
+- name: Start MySQL serve
+  systemd:
+    name: mysqld
+    state: started
+    enabled: yes
+- name: Insitalize MySQL and set root password
+  shell:
+    /usr/bin/mysqld --initialize-insecure --user=mysql
+    systemctl start mysqld
+    NEWPASS="Accelecom@123"
+    MYSQL_TEMP_PASSWORD=$(grep 'temporary password' /var/log/mysqld.log | awk '{print $NF}')
+    mysql --connect-expired-password -uroot -p"$MYSQL_TEMP_PASSWORD" --execute="ALTER USER 'root'@'localhost' IDENTIFIED BY '$NEWPASS';"
+  args:
+    creates: /var/lib/mysql/mysql
+
+

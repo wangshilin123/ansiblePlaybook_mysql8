@@ -1,0 +1,5 @@
+- name: Install MySQL84
+  hosts: 192.168.86.7
+  become: yes
+  roles:
+    - mysql
